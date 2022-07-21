@@ -1,13 +1,26 @@
 # %%
 import os
+from cv2 import imshow
 # import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import pandas_profiling as pdp
 import glob
 import cv2
+from pyparsing import originalTextFor
 from tqdm import tqdm
-# from tqdm.contrib import tenumerate
+from tqdm.contrib import tenumerate
+
+# %%
+config = {
+    "figure.figsize": [16, 16],
+    "axes.titlesize": 40,
+    "axes.labelsize": 30,
+    "font.size": 20
+}
+plt.rcParams.update(config)
+# print(plt.rcParams)
+pd.options.display.precision = 4
+
 # %%
 root = 'AGMdataset_2.5/trainval.txt'
 
@@ -21,86 +34,62 @@ AGM_dict = {
 
 # %%
 names = ['tag', 'age', 'gender', 'mask']
-AGM_df = pd.read_csv(root, header=None, names=names, sep=' ').sort_values('tag')
-AGM_df.head()
-len(AGM_df)
+AGM_df = pd.read_csv(root, header=None, names=names, sep=' ')
+AGM_df['height'] = 0.0
+AGM_df['width'] = 0.0
+AGM_df['area'] = 0.0
+AGM_df['SDD-FIQA'] = 0.0
+# AGM_df.head()
+# len(AGM_df)
 # pdp.ProfileReport(AGM_df)
-# %%
-config = {
-    "figure.figsize": [16, 16],
-    "axes.titlesize": 40,
-    "axes.labelsize": 30,
-    "font.size": 20
-}
-plt.rcParams.update(config)
-# print(plt.rcParams)
-# %%
-# # age
-# fig, ax = plt.subplots(figsize = (16, 16))
-# # ax.plot(AGM_df['age'])
-# bins = range(0, 101, 10)
-# ax.hist(AGM_df['age'], bins=bins)
-# ax.set_xticks(bins)
-# ax.set_xlabel('age')
-# ax.set_ylabel('count')
-# ax.set_title('Age')
-# plt.show()
-
-# # gender
-# male = AGM_df['gender'] == 'male'
-# # print(male.sum())
-# female = AGM_df['gender'] == 'female'
-# # print((female.sum()))
-# fig, ax = plt.subplots(figsize = (16, 16))
-# left = ['male', 'female']
-# height = [male.sum(), female.sum()]
-# ax.bar(left, height)
-# ax.set_ylabel('count')
-# ax.set_title('Gender')
-# plt.show()
-
-# # mask
-# mask = AGM_df['mask'] == 'mask'
-# # print(mask.sum())
-# nomask = AGM_df['mask'] == 'nomask'
-# # print((nomask.sum()))
-
-# fig, ax = plt.subplots(figsize = (16, 16))
-# left = ['mask', 'nomask']
-# height = [mask.sum(), nomask.sum()]
-# ax.bar(left, height)
-# ax.set_ylabel('count')
-# ax.set_title('Mask')
-# plt.show()
-
-
 
 # %%
-path_list = sorted(glob.glob('AGMdataset_2.5/images/**.jpg', recursive=True))
+AGM_df.sort_values('tag', inplace=True)
+AGM_df.head()
 
+# %%
+AGM_df_re = AGM_df.reset_index()
+AGM_df_re.head()
+
+# %%
+score_df = pd.read_csv('AGMdataset_2.5/eval_AGM.csv', sep=',')
+
+# %%
+for i in range(10):
+    print(AGM_df_re['tag'][i])
+    print(score_df['tag'][i], score_df['SDD-FIQA'][i])
+    # print(AGM_df['tag'][i])
+
+# %%
 img_list = []
-img_shape_list = []
-img_area_list = []
-
-for path in tqdm(path_list):
+for i in tqdm(range(len(AGM_df_re))):
+    tag = AGM_df_re['tag'][i]
+    path = 'AGMdataset_2.5/images/' + tag
+    # print(path)
     img = cv2.imread(path)
     img_list.append(img)
-    img_shape_list.append(img.shape)
-    img_area_list.append(img.shape[0] * img.shape[1])
+    AGM_df_re['height'][i] = img.shape[0]
+    AGM_df_re['width'][i] = img.shape[1]
+    AGM_df_re['area'][i] = img.shape[0] * img.shape[1]
+    AGM_df_re['SDD-FIQA'][i] = score_df['SDD-FIQA'][i]
 
 # %%
-img_df = pd.DataFrame((img_shape_list, img_area_list), index=['img_shape', 'img_area']).T
-# print(len(img_df))
+AGM_df_re[0:1]
 
-# age
-fig, ax = plt.subplots(figsize = (16, 16))
-# bins = range(0, 101, 10)
-ax.hist(img_df['img_area'], bins = 100)
-# ax.set_xticks(bins)
-ax.set_xlabel('area')
-ax.set_ylabel('count')
-ax.set_title('Area Distribution [AGMdataset_2.5]')
-plt.grid()
+# %%
+fig, ax = plt.subplots()
+x = AGM_df_re['area']
+y = AGM_df_re['SDD-FIQA']
+ax.scatter(x, y)
+
+corr = round(AGM_df_re["area"].corr(AGM_df_re["SDD-FIQA"]), 5)
+
+ax.text(x=100000, y=10, s='correlation = ' + str(corr), fontsize=25, c='orange')
+ax.set_xlabel('Area [pixel]')
+ax.set_ylabel('SDD-FIQA')
 plt.show()
+# %%
+
+AGM_df_re.to_csv('AGMdataset_2.5/trainval(1).csv', ',')
 
 # %%
